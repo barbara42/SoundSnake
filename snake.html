@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<script src="/Users/barbara/Documents/Projects/jquery.js" type="text/javascript"></script>
+	<!--cscript src="https://w.soundcloud.com/player/api.js"></script-->
+	<script type="text/javascript" src="http://connect.soundcloud.com/sdk.js"></script>
+	<script type="text/javascript" src="https://w.soundcloud.com/player/api.js"></script>
+	<script type="text/javascript">
+	    SC.initialize({
+	      client_id: "92e690e891a9ea26b6f280737b5641b1",
+	    });
+	    //soundcloud widget
+	    var myWidget; 
+	    var ctx, w, h; 
+	    var displayingOptions = false; 
+	    var secondsGathered = 20; 
+		$(document).ready(function(){
+			//assigns widget to iframe 
+			var iframeElement   = document.querySelector('iframe');
+			var iframeElementID = iframeElement.id;
+			myWidget = SC.Widget(iframeElement);
+
+			//Canvas stuff
+			var canvas = $("#canvas")[0];
+			ctx = canvas.getContext("2d");
+			w = $(window).width() - 20;
+			h = $(window).height() - 206; 
+			canvas.width = w;
+			canvas.height = h; 
+			//makes canvas black
+			ctx.fillStyle = 'black';
+			ctx.fillRect(0,0,w,h); 
+		});//END document ready 
+
+			var cw = 10; 
+			var score; 
+			//food array
+			var food_array; 
+			var dir; 
+			var loop; 
+			var color_array; 
+			var color_food = 0; 
+
+			var snake_array; 
+			//creates a snake of length l 
+			function create_snake(){
+				var length = 5; 
+				snake_array = []; 
+				color_array = []; 
+				for (var i = length; i > 0; i --){
+					snake_array.push({x:i, y:0}); 
+					color_array.push(0); 
+				}
+			}
+			function create_food(){
+				var x = Math.round(Math.random()*(w-cw)/cw); 
+				var y = Math.round(Math.random()*(h-cw)/cw);
+				//food array
+				food_array.push({x:x, y:y});  
+				return {x:x, y:y}; 
+			}
+			//Rainbow colors 
+			function rainbow_color(num){
+				var r, g, b; 
+				switch (num){
+					case 0: 
+						return 'red'; 
+					case 1: //orange
+						r = 255; 
+						//g = Math.round(Math.random()*22 + 118); //118 to 140 
+						g = 131;
+						b = 0; 
+						break; 
+					case 2: //yellow
+						//r = Math.round(Math.random()*40 + 215); //215 to 255
+						//g = Math.round(Math.random()*40 + 215);
+						r = 255; 
+						g = 255; 
+						b = 0; 
+						break; 
+					case 3: //green
+						r = 0; 
+						//g = Math.round(Math.random()*55 + 200);//200 to 255
+						g = 218; 
+						b = 0; 
+						break; 
+					case 4: //blue
+						r = 0; 
+						//g = Math.round(Math.random()*25 + 230); //230 to 255
+						//b = Math.round(Math.random()*100 + 155); //155 to 255
+						g = 255; 
+						b = 255; 
+						break; 
+					case 5: //purple
+						//r = Math.round(Math.random()*20 + 120); //120 to 140
+						//g = Math.round(Math.random()*25 + 30); //30 to 55
+						//b = Math.round(Math.random()*50 + 205); //205 to 255	
+						r = 138; 
+						g = 43; 
+						b = 226; 
+						break; 		//138, 43, 	226
+				}
+				return "rgb("+r+", "+g+", "+b+")";
+			}
+			//unit of snake 
+			function paint_unit(x,y, color){
+				//ctx.fillStyle = "#00FFFF";
+				ctx.fillStyle = color; 
+				ctx.fillRect(x*cw, y*cw, cw, cw)
+				ctx.strokeStyle = 'black';
+				ctx.strokeRect(x*cw, y*cw, cw, cw); 
+			} 
+			//unit of food
+			function paint_food(food){
+				color_food++; 
+				if (color_food > 5) color_food = 1; 
+				color_array.push(color_food);
+				ctx.fillStyle = rainbow_color(color_food); 
+				ctx.fillRect(food.x*cw, food.y*cw, cw, cw); 
+				ctx.strokeStyle = "black"; 
+				ctx.strokeRect(food.x*cw, food.y*cw, cw, cw)
+			}
+			function check_collision(x,y){ //returns true when collision 
+				//checks to see if any snake units are at the same place as other units 
+				//all but the head
+				for (i = 0; i < snake_array.length - 1; i++){
+					var unit = snake_array[i]; 
+					if(x == unit.x && y == unit.y){
+						return true; 
+					}
+				}
+				//checks for collision with walls
+				var left_side = w/10; 
+				var bottom_side = h/10
+				if (x >= left_side|| x < 0 || y >= bottom_side || y<0){
+					return true;
+				}
+				return false; 
+			}
+			//paints the snake on the canvas
+			function paint(){
+				//pauses game if button clicked 
+				if (isPaused()) return; 
+				//makes canvas black
+				ctx.fillStyle = 'black';
+				ctx.fillRect(0,0,w,h); 
+				//moves snake
+				var head_x = snake_array[0].x; 
+				var head_y = snake_array[0].y; 
+				if (dir == "right") head_x++; 
+				else if (dir == "left") head_x--; 
+				else if (dir == "up") head_y--; 
+				else if(dir == "down") head_y++; 
+				//if collision, start over
+				if (check_collision(head_x, head_y)){
+					clearInterval(loop);
+					//pauses song while game starts over 
+					myWidget.pause(); 
+					return;
+				} 
+				//checks to see if eats food
+				//food array
+				var isFoodEaten = false;
+				var foodEaten = null;  
+				for (var i = 0; i < food_array.length; i++){
+					var food = food_array[i];
+					if (head_y == food.y && head_x == food.x){
+						if (displayingOptions == true){
+							//desplays option tags 
+							
+
+							//get genre selected 
+							var genre = genreSelected(i); 
+							console.log(genre);
+							newSong(myWidget, genre);
+							//clear food_array, and start repopulating it 
+							food_array.length = 0; 
+							displayingOptions = false; 
+							startFoodFactory(); 
+						}
+						console.log("FOOD EATEN"); 
+						isFoodEaten = true; 
+						foodEaten = food; 
+						//removes food item from array 
+						food_array.splice(i,1);
+					} 
+				}
+				if (isFoodEaten){
+					snake_array.push(foodEaten);
+					score++; 
+				}
+				else{
+					var tail = snake_array.pop();
+					tail.x = head_x; 
+					tail.y = head_y; 
+					snake_array.unshift(tail);
+				}
+
+				///OLD STUFF
+				/*if (head_y == food.y && head_x == food.x){
+					snake_array.push(food);
+					food = create_food(); 
+					score++; 
+				}
+				else {
+					var tail = snake_array.pop();
+					tail.x = head_x; 
+					tail.y = head_y; 
+					snake_array.unshift(tail);
+				}*/
+				//paints snake
+				for (var i = 0; i < snake_array.length; i++){
+					var unit = snake_array[i]; 
+					var color = color_array[i];
+					paint_unit(unit.x, unit.y, rainbow_color(color));
+				}
+				//paints food
+				for (var i = 0; i < food_array.length; i ++){
+					var food = food_array[i]; 
+					paint_food(food); 
+				}
+				//paints tags if options are being displayed
+				if (displayingOptions){
+					drawTags(); 
+				}
+				//paints score
+				ctx.fillStyle = 'white';
+				ctx.fillText("Score: " + score, w - 60, 10); 
+				ctx.fillText("Seconds: " + secondsGathered, w - 160, 10); 
+			}
+			function displayOptions(){
+				//clear food array
+				food_array.length = 0;  
+				displayingOptions = true; 
+				//create array of food that correlate with a genre
+				var x = Math.round((3/4)*(w-cw)/cw); 
+				var y = (h-cw)/cw;
+				//var x = 20; 
+				//var y = 20;  
+				var electronic = {x:x, y:Math.round((1/10)*y)};
+				var metal = {x:x, y:Math.round((2/10)*y)};
+				var alternative = {x:x, y:Math.round((3/10)*y)};
+				var indie = {x:x, y:Math.round((4/10)*y)};
+				var rock = {x:x, y:Math.round((5/10)*y)};
+				var classical = {x:x, y:Math.round((6/10)*y)};
+				var acoustic = {x:x, y:Math.round((7/10)*y)};
+				var punk  = {x:x, y:Math.round((8/10)*y)};
+				food_array = [electronic, metal, alternative, indie, rock, classical, acoustic, punk];
+				//paints food pieces 
+				for (var i = 0; i < food_array.length; i ++){
+					var food = food_array[i]; 
+					paint_food(food); 
+				}
+			}
+			function drawTags(){
+				ctx.fillStyle = 'white';
+				var x = (3/4)*w + 5; 
+				var y = h; 
+				var shift = 3; 
+				ctx.fillText("electronic", x, Math.round((1/10)*y) + shift);
+				ctx.fillText("metal", x, Math.round((2/10)*y)+ shift);
+				ctx.fillText("alternative", x, Math.round((3/10)*y)+ shift);
+				ctx.fillText("indie",x, Math.round((4/10)*y)+ shift);
+				ctx.fillText("rock",x, Math.round((5/10)*y)+ shift);
+				ctx.fillText("classical",x,Math.round((6/10)*y)+ shift);
+				ctx.fillText("acoustic", x, Math.round((7/10)*y)+ shift);
+				ctx.fillText("punk",x,Math.round((8/10)*y)+ shift);
+			}
+			function genreSelected(index){
+				switch(index){
+					case 0: 
+						return "electronic";
+					case 1:
+						return "metal"; 
+					case 2: 
+						return "alternative"; 
+					case 3: 
+						return "indie";
+					case 4: 
+						return "rock";
+					case 5: 
+						return "classical";
+					case 6: 
+						return "acoustic";
+					case 7:
+						return "punk";
+				}
+				return null; 
+			}
+			//loads a new song into the widget  
+			function newSong(widget, myGenre) {  
+				SC.get('https://api.soundcloud.com/tracks', { genres: myGenre},
+			  		function(tracks) {
+					    var random = Math.floor(Math.random() * 49);
+					    var track_url = tracks[random].permalink_url;
+					    console.log(track_url);
+					    widget.load(track_url);
+					    widget.bind(SC.Widget.Events.READY, function(){
+					    	widget.play(); 
+					    })
+				    }
+				);
+			}
+			function getBPM(){ //DOES NOT WORK 
+				myWidget.getCurrentSound(function(currentSound){
+					console.log("CurrentSound bpm = " + currentSound.bpm);
+				});
+			}
+			function startFoodFactory(){
+				//creates one randomly placed food every 1 second  
+				//var foodloop = undefined; 
+				//if(typeof foodloop != "undefined" || displayingOptions == false) clearInterval(foodloop);
+				foodloop = setInterval(create_food, 5000);
+			}
+			function stopFoodFactory(){
+				clearInterval(foodloop);
+			}
+			
+			//keeps track of keyboard arrow action 
+			$(document).keydown(function(e){
+				var key = e.which; 
+				if (key == "37" && dir != "right") dir = "left"; 
+				else if (key == "38" && dir != "down") dir = "up";
+				else if (key == "39" && dir != "left") dir = "right";
+				else if (key == "40" && dir != "up") dir = "down";	
+			})
+
+
+			//MAIN SHIT HAPPENING 
+			function init(){
+				score = 0; 
+				dir = "right"; 
+				food_array = new Array(); 
+				create_snake(); 
+				myWidget.play(); 
+				myWidget.bind(SC.Widget.Events.FINISH, function(){
+					stopFoodFactory(); 
+					displayOptions(); 
+				});
+				getBPM(); 
+				//displayOptions(); 
+				//creates one randomly placed food every 1 second  
+				/*foodloop = setInterval(create_food, 1000);
+				if(typeof foodloop != "undefined" || displayingOptions == true) clearInterval(foodloop);*/
+				create_food(); 
+				startFoodFactory(); 
+				//loops main snake moving paint class 
+				if(typeof loop != "undefined") clearInterval(loop);
+				loop = setInterval(paint, 60);
+			}
+			//init(); 
+
+		//})
+
+		function play(){
+			var button = document.getElementById("play_button"); 
+			var button_text = button.textContent; 
+			if (button_text == "play"){
+				button.textContent = "pause";
+				myWidget.play(); 
+			} else if (button_text == "pause"){
+				button.textContent = "play"; 
+				myWidget.pause(); 
+			}
+		}
+		function isPaused(){ //returns true if paused, false is playing 
+			var button = document.getElementById("play_button"); 
+			var button_text = button.textContent; 
+			if (button_text == "play") return true; 
+			else if (button_text == "pause") return false; 
+		}
+	</script>
+</head>
+<body style="background:black;">
+<!-- 	<iframe id="spotify_iframe" src="https://embed.spotify.com/?uri=spotify:track:3gvAGvbMCRvVDDp8ZaIPV5" width="300" height="380" frameborder="0" allowtransparency="true"></iframe> -->
+	<div id="target"></div>
+	
+	<!--iframe id="soundcloud_iframe" width="100%" height="166" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/99350098"></iframe-->
+	<iframe id="soundcloud_iframe" width="100%" height="166" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/99350098"></iframe>
+	<button id="start_button" onclick="init()">START GAME</button>
+	<button id="play_button" onclick="play()">pause</button>
+	<canvas id="canvas" width-"450" height="450"></canvas>
+</body>
+</html>
